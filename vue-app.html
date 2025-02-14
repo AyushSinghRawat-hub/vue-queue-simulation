@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Vue Queue Simulation</title>
+  <style>
+    /* General Styles */
+    body {
+      font-family: Arial, sans-serif;
+      background-color: #f9f9f9;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      margin: 0;
+    }
+
+    #vueApp {
+      border: solid 2px #333;
+      padding: 20px;
+      margin: 20px;
+      background-color: white;
+      width: 350px;
+      box-sizing: border-box;
+      border-radius: 8px;
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+    }
+
+    #animAndSigns {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      width: 100%;
+      margin-bottom: 10px;
+    }
+
+    #frameDiv {
+      display: flex;
+      flex-direction: row;
+      justify-content: center;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: nowrap;
+      overflow-x: auto;
+      padding: 10px 0;
+    }
+
+    .diceDiv {
+      width: 50px;
+      height: 50px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      background-color: lightgray;
+      border-radius: 8px;
+      margin: 5px;
+      font-size: 18px;
+      font-weight: bold;
+      transition: all 0.3s ease-in-out;
+      cursor: pointer;
+      text-align: center;
+    }
+
+    .diceDiv.active {
+      background-color: #ffcc00; /* Highlight active die */
+      transform: scale(1.1);
+    }
+
+    button {
+      width: 100%;
+      margin-top: 10px;
+      padding: 12px;
+      background-color: #4CAF50;
+      color: white;
+      border: none;
+      cursor: pointer;
+      border-radius: 6px;
+      font-size: 16px;
+      transition: background-color 0.3s;
+    }
+
+    button:hover {
+      background-color: #45a049;
+    }
+
+    button:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+
+    p {
+      text-align: center;
+      font-size: 18px;
+      color: #333;
+      margin-top: 15px;
+    }
+
+    img {
+      width: 50px;
+      height: 50px;
+      margin: 0 5px;
+    }
+
+    .markerDiv {
+      width: 10px;
+      height: 10px;
+      background-color: #bbb;
+      border-radius: 50%;
+      margin: 0 5px;
+    }
+  </style>
+</head>
+<body>
+  <div id="vueApp" data-v-app>
+    <div id="animAndSigns">
+      <img src="img_queuessign_out.svg" alt="Out sign">
+      <div class="markerDiv"></div>
+      <div id="frameDiv">
+        <div class="diceDiv" v-for="(die, index) in dice" :key="die.keyNmbr" 
+             :style="{ backgroundColor: die.bcColor, height: '50px' }" 
+             :class="{'active': die.isActive}">
+          <span>{{ die.dieNmbr }}</span>
+        </div>
+      </div>
+      <div class="markerDiv"></div>
+      <img src="img_queuessign_in.svg" alt="In sign">
+    </div>
+    <p>Result: {{ currVal }}</p>
+    <button @click="queue('enqueue')" :disabled="pushIsDisabled">enqueue()</button>
+    <button @click="queue('dequeue')" :disabled="popIsDisabled">dequeue()</button>
+    <button @click="queue('peek')" :disabled="popIsDisabled">peek()</button>
+    <button @click="queue('size')">size()</button>
+    <button @click="queue('isEmpty')">isEmpty()</button>
+  </div>
+
+  <!-- Vue.js script -->
+  <script src="https://cdn.jsdelivr.net/npm/vue@3.2.45"></script>
+  <script>
+    const app = Vue.createApp({
+      data() {
+        return {
+          currVal: null, 
+          delay: 300,
+          dice: [],
+          bcColor: ["rgb(184, 249, 184)", "rgb(184, 249, 249)", "rgb(249, 184, 184)", "rgb(249, 184, 249)", "rgb(184, 249, 184)"],
+          keyNumber: 0,
+          justClickedPop: false,
+          justClickedPush: false,
+          resultText: 'Result'
+        };
+      },
+      computed: {
+        popIsDisabled() {
+          return this.queueTooShort || this.justClickedPop;
+        },
+        pushIsDisabled() {
+          return this.queueTooLong || this.justClickedPush;
+        },
+        queueTooLong() {
+          return this.dice.length >= 7;
+        },
+        queueTooShort() {
+          return this.dice.length <= 0;
+        }
+      },
+      watch: {
+        delay: {
+          immediate: true,
+          handler() {
+            this.updateMoveDuration();
+          }
+        }
+      },
+      methods: {
+        updateMoveDuration() {
+          const stylesheets = document.styleSheets;
+          for (const stylesheet of stylesheets) {
+            const rules = stylesheet.cssRules || stylesheet.rules;
+            for (const rule of rules) {
+              if (rule.selectorText === '.v-move') {
+                rule.style.transitionDuration = `${this.delay}ms`;
+                break;
+              }
+            }
+          }
+        },
+        async queue(operation) {
+          this.currVal = '';
+          this.resultText = 'Result';
+          let lastElIndex = this.dice.length - 1;
+
+          if (operation === 'enqueue') {
+            this.justClickedPush = true;
+            const newDie = {
+              dieNmbr: this.newRandom(),
+              keyNmbr: this.keyNumber,
+              isActive: false,
+              bcColor: 'rgb(252, 252, 113)',
+            };
+            this.dice.push(newDie);
+            lastElIndex = this.dice.length - 1;
+            this.dice[lastElIndex].isActive = true;
+            await new Promise(resolve => setTimeout(resolve, 500));
+            this.dice[lastElIndex].isActive = false;
+            this.keyNumber++;
+            this.dice[lastElIndex].bcColor = this.bcColor[this.dice[lastElIndex].dieNmbr - 1];
+            this.justClickedPush = false;
+          } else if (operation === 'dequeue') {
+            this.dice[0].isActive = true;
+            this.justClickedPop = true;
+            this.dice[0].bcColor = 'rgb(252, 252, 113)';
+            await new Promise(resolve => setTimeout(resolve, 150));
+            this.currVal = this.dice[0].dieNmbr;
+            this.dice.splice(0, 1);
+            this.justClickedPop = false;
+          } else if (operation === 'peek') {
+            this.resultText = 'First value';
+            this.dice[0].isActive = true;
+            this.dice[0].bcColor = 'rgb(252, 252, 113)';
+            await new Promise(resolve => setTimeout(resolve, 350));
+            this.currVal = this.dice[0].dieNmbr;
+            this.dice[0].bcColor = this.bcColor[this.dice[0].dieNmbr];
+            this.dice[0].isActive = false;
+          } else if (operation === 'isEmpty') {
+            this.resultText = 'Is empty';
+            for (const die of this.dice) {
+              die.isActive = true;
+              die.bcColor = 'rgb(252, 252, 113)';
+            }
+            await new Promise(resolve => setTimeout(resolve, 350));
+            for (const die of this.dice) {
+              die.isActive = false;
+              die.bcColor = this.bcColor[die.dieNmbr - 1];
+            }
+            this.currVal = this.dice.length <= 0 ? 'True' : 'False';
+          } else if (operation === 'size') {
+            this.resultText = 'Size';
+            for (const die of this.dice) {
+              die.isActive = true;
+              die.bcColor = 'rgb(252, 252, 113)';
+            }
+            await new Promise(resolve => setTimeout(resolve, 350));
+            for (const die of this.dice) {
+              die.isActive = false;
+              die.bcColor = this.bcColor[die.dieNmbr - 1];
+            }
+            this.currVal = this.dice.length;
+          } else {
+            console.log("What happened??");
+          }
+        },
+        newRandom() {
+          let rand = 5;
+          while (rand === 5) {
+            rand = Math.floor(Math.random() * 5) + 1;
+          }
+          return rand;
+        },
+        addDie() {
+          const newDie = {
+            dieNmbr: this.newRandom(),
+            keyNmbr: this.keyNumber,
+            bcColor: null,
+            isActive: false,
+          };
+          newDie.bcColor = this.bcColor[newDie.dieNmbr - 1];
+          this.dice.unshift(newDie); // Adds the new die to the front of the array
+          this.keyNumber++;
+        },
+        addDie50() {
+          this.dice = [];
+          this.currVal = null;
+          for (let i = 0; i < 4; i++) {
+            this.addDie();
+          }
+        }
+      },
+      mounted() {
+        this.addDie50();
+        this.updateMoveDuration();
+      }
+    });
+
+    app.mount('#vueApp');
+  </script>
+</body>
+</html>
+
